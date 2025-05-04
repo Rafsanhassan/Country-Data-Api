@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Countries Information</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .country-card {
+            transition: transform 0.3s;
+            height: 100%;
+        }
+        .country-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+        .flag-container {
+            height: 120px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+        .flag-container img {
+            max-height: 100%;
+            max-width: 100%;
+            object-fit: contain;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="/">Countries Information</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="/">Home</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/">Admin</a>
+                    </li>
+                </ul>
+                <div class="d-flex">
+                    {% if user.is_authenticated %}
+                        <span class="navbar-text me-3">Welcome, {{ user.username }}</span>
+                        <a href="{% url 'logout' %}" class="btn btn-outline-light">Logout</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-outline-light">Login</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <h1>Countries Information</h1>
+                <p class="lead">Explore information about {{ countries_count }} countries around the world.</p>
+            </div>
+            <div class="col-md-6">
+                <div class="input-group mt-3">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search countries...">
+                    <button class="btn btn-primary" id="searchButton">Search</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        Filter by Region
+                    </div>
+                    <div class="card-body">
+                        <div class="btn-group" role="group" id="regionFilters">
+                            <button type="button" class="btn btn-outline-primary active" data-region="all">All</button>
+                            {% for region in regions %}
+                                {% if region %}
+                                    <button type="button" class="btn btn-outline-primary" data-region="{{ region }}">{{ region }}</button>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row" id="countriesContainer">
+            <div class="col-12 text-center">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p>Loading countries data...</p>
+            </div>
+        </div>
+
+        <div class="modal fade" id="countryModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="countryModalLabel">Country Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body" id="countryModalBody">
+                        <div class="text-center">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p>Loading country details...</p>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="bg-dark text-white py-4 mt-5">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-6">
+                    <p>&copy; 2025 Countries Information</p>
+                </div>
+                <div class="col-md-6 text-md-end">
+                    <p>Data provided by <a href="https://restcountries.com" class="text-white">REST Countries API</a></p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables
+        let countriesData = [];
+        let selectedRegion = 'all';
+        let countryModal;
+
+        // DOM elements
+        const countriesContainer = document.getElementById('countriesContainer');
+        const searchInput = document.getElementById('searchInput');
+        const searchButton = document.getElementById('searchButton');
+        const regionFilters = document.getElementById('regionFilters');
+        
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize Bootstrap modal
+            countryModal = new bootstrap.Modal(document.getElementById('countryModal'));
+            
+            // Fetch countries data
+            fetchCountries();
+            
+            // Set up event listeners
+            searchButton.addEventListener('click', handleSearch);
+            searchInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    handleSearch();
+                }
+            });
+            
+            // Region filter buttons
+            const regionButtons = regionFilters.querySelectorAll('button');
+            regionButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    // Remove active class from all buttons
+                    regionButtons.forEach(btn => btn.classList.remove('active'));
+                    // Add active class to clicked button
+                    this.classList.add('active');
+                    // Set selected region
+                    selectedRegion = this.dataset.region;
+                    // Filter countries
+                    filterCountries();
+                });
+            });
+        });
+
+        // Fetch countries from API
+        async function fetchCountries() {
+            try {
+                const response = await fetch('/api/countries/');
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch countries data');
+                }
+                
+                countriesData = await response.json();
+                
+                // Display countries
+                filterCountries();
+                
+            } catch (error) {
+                console.error('Error fetching countries:', error);
+                countriesContainer.innerHTML = `
+                    <div class="col-12 text-center">
+                        <div class="alert alert-danger">
+                            Failed to load countries data. Please try again later.
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Filter and display countries
+        function filterCountries() {
+            let filteredCountries = countriesData;
+            
+            // Filter by region if not "all"
+            if (selectedRegion !== 'all') {
+                filteredCountries = filteredCountries.filter(country => country.region === selectedRegion);
+            }
+            
+            // Filter by search term if there is one
+            const searchTerm = searchInput.value.trim().toLowerCase();
+            if (searchTerm) {
+                filteredCountries = filteredCountries.filter(country => 
+                    country.name_common.toLowerCase().includes(searchTerm)
+                );
+            }
+            
+            // Display filtered countries
+            displayCountries(filteredCountries);
+        }
+
+        // Display countries in the container
+        function displayCountries(countries) {
+            if (countries.length === 0) {
+                countriesContainer.innerHTML = `
+                    <div class="col-12 text-center">
+                        <div class="alert alert-info">
+                            No countries found matching your criteria.
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            
+            countries.forEach(country => {
+                html += `
+                    <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
+                        <div class="card country-card h-100" data-country-code="${country.cca3}">
+                            <div class="flag-container p-2">
+                                <img src="${country.flag_png || ''}" alt="${country.name_common} flag" class="card-img-top" 
+                                     onerror="this.onerror=null;this.src='https://via.placeholder.com/150x100?text=No+Flag';">
+                            </div>
+                            <div class="card-body">
+                                <h5 class="card-title">${country.flag_emoji || ''} ${country.name_common
