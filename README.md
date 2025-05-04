@@ -1,5 +1,8 @@
 
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e9f256f (Update README.md)
 # Countries Information API
 
 This Django application fetches and displays data about countries from the REST Countries API. It provides both a web interface and RESTful API endpoints for accessing country information.
@@ -94,5 +97,8 @@ Run tests with:
 ```bash
 python manage.py test
 ```
+<<<<<<< HEAD
 =======
 >>>>>>> commit123
+=======
+>>>>>>> e9f256f (Update README.md)
