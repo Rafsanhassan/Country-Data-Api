@@ -1,79 +1,82 @@
-from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
-from rest_framework import viewsets, filters, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework import viewsets, status, filters
+from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from django.shortcuts import render, get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
-
 from .models import Country
-from .serializers import CountrySerializer, CountryListSerializer, CountryDetailSerializer
+from .serializers import CountrySerializer, CountryDetailSerializer
 
-# Web views
-@login_required
 def index(request):
-    """Render the home page with countries data"""
-    countries_count = Country.objects.count()
-    regions = Country.objects.values_list('region', flat=True).distinct()
-    context = {
-        'countries_count': countries_count,
-        'regions': regions,
-    }
-    return render(request, 'myapp/index.html', context)
+    """View for the web interface."""
+    return render(request, 'myapp/index.html')
 
-# API views
-class CountryViewSet(viewsets.ReadOnlyModelViewSet):
+class CountryViewSet(viewsets.ModelViewSet):
     """
-    API endpoint for viewing countries
+    API endpoint for countries that allows CRUD operations.
+    
+    list:
+    Return a list of all countries.
+    
+    retrieve:
+    Return details of a specific country.
+    
+    create:
+    Create a new country entry.
+    
+    update:
+    Update an existing country's details.
+    
+    destroy:
+    Delete an existing country.
     """
-    queryset = Country.objects.all()
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter, DjangoFilterBackend]
-    search_fields = ['name_common', 'name_official', 'capital', 'region', 'subregion']
-    ordering_fields = ['name_common', 'population', 'area']
-    filterset_fields = ['region', 'subregion', 'independent', 'landlocked']
-    permission_classes = [permissions.IsAuthenticated]
+    queryset = Country.objects.all().order_by('name')
+    permission_classes = [IsAuthenticatedOrReadOnly]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['region', 'subregion', 'alpha2code', 'alpha3code']
+    search_fields = ['name', 'alpha2code', 'alpha3code', 'capital']
+    ordering_fields = ['name', 'population', 'area']
     
     def get_serializer_class(self):
-        if self.action == 'list':
-            return CountryListSerializer
-        return CountryDetailSerializer
+        if self.action == 'retrieve':
+            return CountryDetailSerializer
+        return CountrySerializer
 
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def get_regions(request):
-    """
-    API endpoint to get unique regions
-    """
-    regions = Country.objects.values_list('region', flat=True).distinct()
-    regions = [region for region in regions if region]  # Filter out None/empty values
-    return Response(sorted(regions))
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def search_countries(request):
-    """
-    API endpoint to search countries by term
-    """
-    search_term = request.query_params.get('q', '')
-    if not search_term:
-        return Response({'error': 'Search term is required'}, status=400)
-    
-    countries = Country.objects.filter(name_common__icontains=search_term)
-    serializer = CountryListSerializer(countries, many=True)
-    return Response(serializer.data)
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def get_country_by_code(request, code):
-    """
-    API endpoint to get a country by its code (cca2 or cca3)
-    """
-    try:
-        if len(code) == 2:
-            country = Country.objects.get(cca2__iexact=code)
-        else:
-            country = Country.objects.get(cca3__iexact=code)
-        
-        serializer = CountryDetailSerializer(country)
+    @action(detail=True, methods=['get'])
+    def same_region(self, request, pk=None):
+        """List all countries in the same region as the specified country."""
+        country = self.get_object()
+        same_region_countries = Country.objects.filter(region=country.region).exclude(id=country.id)
+        serializer = CountrySerializer(same_region_countries, many=True)
         return Response(serializer.data)
-    except Country.DoesNotExist:
-        return Response({'error': 'Country not found'}, status=404)
+
+    @action(detail=False, methods=['get'])
+    def by_language(self, request):
+        """List countries that speak a specified language."""
+        language = request.query_params.get('language', None)
+        if language is None:
+            return Response(
+                {"error": "Language parameter is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        # Filter countries where the specified language is in the languages field
+        # This implementation assumes languages are stored as a JSON array of language codes or names
+        # Adjust the query based on how languages are stored in your model
+        countries = Country.objects.filter(languages__icontains=language)
+        serializer = CountrySerializer(countries, many=True)
+        return Response(serializer.data)
+
+    @action(detail=False, methods=['get'])
+    def search(self, request):
+        """Search for countries by name with partial matching."""
+        query = request.query_params.get('name', None)
+        if query is None:
+            return Response(
+                {"error": "Name parameter is required"}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+            
+        countries = Country.objects.filter(name__icontains=query)
+        serializer = CountrySerializer(countries, many=True)
+        return Response(serializer.data)

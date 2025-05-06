@@ -1,17 +1,15 @@
 from django.urls import path, include
-from rest_framework import routers
+from rest_framework.routers import DefaultRouter
 from . import views
 
-router = routers.DefaultRouter()
-router.register(r'countries', views.CountryViewSet)
+# Create a router and register our viewsets with it
+router = DefaultRouter()
+router.register(r'countries', views.CountryViewSet, basename='country')
 
 urlpatterns = [
-    # Web views
+    # Web interface URL
     path('', views.index, name='index'),
     
-    # API endpoints
+    # API URLs
     path('api/', include(router.urls)),
-    path('api/regions/', views.get_regions, name='regions'),
-    path('api/search/', views.search_countries, name='search'),
-    path('api/country/<str:code>/', views.get_country_by_code, name='country-detail'),
 ]

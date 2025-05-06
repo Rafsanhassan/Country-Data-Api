@@ -11,7 +11,7 @@ class CountryListSerializer(serializers.ModelSerializer):
     """Simplified serializer for listing countries"""
     class Meta:
         model = Country
-        fields = ['id', 'name_common', 'cca3', 'flag_emoji', 'region']
+        fields = ['id', 'name', 'alpha2code', 'alpha3code', 'capital', 'region', 'population']
 
 class CountryDetailSerializer(serializers.ModelSerializer):
     """Detailed serializer for a single country"""
