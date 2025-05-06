@@ -1,254 +1,534 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Countries Information</title>
+    <title>Country Data Explorer</title>
+    <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        .country-card {
-            transition: transform 0.3s;
-            height: 100%;
+        .flag-img {
+            height: 40px;
+            width: auto;
+            border: 1px solid #ddd;
         }
-        .country-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        .search-container {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
         }
-        .flag-container {
-            height: 120px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
+        .country-table {
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
         }
-        .flag-container img {
-            max-height: 100%;
-            max-width: 100%;
-            object-fit: contain;
+        .modal-flag {
+            height: 100px;
+            width: auto;
+            display: block;
+            margin: 0 auto 20px;
+        }
+        .loader {
+            border: 5px solid #f3f3f3;
+            border-radius: 50%;
+            border-top: 5px solid #3498db;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .page-item.active .page-link {
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .region-badge {
+            font-size: 85%;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-md navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
         <div class="container">
-            <a class="navbar-brand" href="/">Countries Information</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="/">Home</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="/admin/">Admin</a>
-                    </li>
-                </ul>
-                <div class="d-flex">
-                    {% if user.is_authenticated %}
-                        <span class="navbar-text me-3">Welcome, {{ user.username }}</span>
-                        <a href="{% url 'logout' %}" class="btn btn-outline-light">Logout</a>
-                    {% else %}
-                        <a href="{% url 'login' %}" class="btn btn-outline-light">Login</a>
-                    {% endif %}
-                </div>
-            </div>
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-globe-americas me-2"></i>
+                Country Data Explorer
+            </a>
         </div>
     </nav>
 
     <div class="container mt-4">
-        <div class="row mb-4">
-            <div class="col-md-6">
-                <h1>Countries Information</h1>
-                <p class="lead">Explore information about {{ countries_count }} countries around the world.</p>
-            </div>
-            <div class="col-md-6">
-                <div class="input-group mt-3">
-                    <input type="text" id="searchInput" class="form-control" placeholder="Search countries...">
-                    <button class="btn btn-primary" id="searchButton">Search</button>
+        <div class="search-container">
+            <div class="row">
+                <div class="col-md-8">
+                    <h4><i class="fas fa-search me-2"></i>Find a Country</h4>
+                    <div class="input-group mb-3">
+                        <input type="text" id="searchInput" class="form-control" placeholder="Search by country name..." aria-label="Search">
+                        <button class="btn btn-outline-primary" type="button" id="searchButton">Search</button>
+                        <button class="btn btn-outline-secondary" type="button" id="resetButton">Reset</button>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <h4><i class="fas fa-filter me-2"></i>Filter</h4>
+                    <select class="form-select" id="regionFilter">
+                        <option value="">All Regions</option>
+                        <!-- Regions will be populated dynamically -->
+                    </select>
                 </div>
             </div>
         </div>
 
-        <div class="row mb-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        Filter by Region
-                    </div>
-                    <div class="card-body">
-                        <div class="btn-group" role="group" id="regionFilters">
-                            <button type="button" class="btn btn-outline-primary active" data-region="all">All</button>
-                            {% for region in regions %}
-                                {% if region %}
-                                    <button type="button" class="btn btn-outline-primary" data-region="{{ region }}">{{ region }}</button>
-                                {% endif %}
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
+        <div id="loadingIndicator" class="loader" style="display: none;"></div>
+        
+        <div id="countriesContainer">
+            <div class="table-responsive">
+                <table class="table table-striped table-hover country-table">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Flag</th>
+                            <th>Name <i class="fas fa-sort" data-sort="name"></i></th>
+                            <th>Code</th>
+                            <th>Capital</th>
+                            <th>Population <i class="fas fa-sort" data-sort="population"></i></th>
+                            <th>Timezone</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="countriesTableBody">
+                        <!-- Table rows will be populated dynamically -->
+                    </tbody>
+                </table>
             </div>
+
+            <nav aria-label="Country pagination">
+                <ul class="pagination justify-content-center" id="pagination">
+                    <!-- Pagination will be populated dynamically -->
+                </ul>
+            </nav>
         </div>
 
-        <div class="row" id="countriesContainer">
-            <div class="col-12 text-center">
-                <div class="spinner-border text-primary" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                <p>Loading countries data...</p>
-            </div>
+        <div id="noResults" class="alert alert-info text-center" style="display: none;">
+            <i class="fas fa-info-circle me-2"></i>No countries found matching your search criteria.
         </div>
+    </div>
 
-        <div class="modal fade" id="countryModal" tabindex="-1">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title" id="countryModalLabel">Country Details</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- Country Details Modal -->
+    <div class="modal fade" id="countryDetailsModal" tabindex="-1" aria-labelledby="countryDetailsModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="countryDetailsModalLabel">Country Details</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="text-center mb-3">
+                        <img id="modalFlag" src="" alt="Country Flag" class="modal-flag">
+                        <h2 id="modalCountryName"></h2>
+                        <span id="modalCountryCode" class="badge bg-secondary me-2"></span>
+                        <span id="modalRegion" class="badge bg-info"></span>
                     </div>
-                    <div class="modal-body" id="countryModalBody">
-                        <div class="text-center">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h5><i class="fas fa-info-circle me-2"></i>Basic Information</h5>
+                                </div>
+                                <div class="card-body">
+                                    <p><strong>Capital:</strong> <span id="modalCapital"></span></p>
+                                    <p><strong>Population:</strong> <span id="modalPopulation"></span></p>
+                                    <p><strong>Area:</strong> <span id="modalArea"></span> km²</p>
+                                    <p><strong>Timezones:</strong> <span id="modalTimezones"></span></p>
+                                </div>
                             </div>
-                            <p>Loading country details...</p>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card mb-3">
+                                <div class="card-header bg-light">
+                                    <h5><i class="fas fa-language me-2"></i>Languages</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul id="modalLanguages" class="list-group">
+                                        <!-- Languages will be populated dynamically -->
+                                    </ul>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5><i class="fas fa-globe me-2"></i>Countries in Same Region</h5>
+                        </div>
+                        <div class="card-body">
+                            <div id="sameRegionLoading" class="text-center" style="display: none;">
+                                <div class="spinner-border text-primary" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                            </div>
+                            <div id="sameRegionContainer">
+                                <!-- Same region countries will be populated dynamically -->
+                            </div>
+                        </div>
                     </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <footer class="bg-dark text-white py-4 mt-5">
-        <div class="container">
-            <div class="row">
-                <div class="col-md-6">
-                    <p>&copy; 2025 Countries Information</p>
-                </div>
-                <div class="col-md-6 text-md-end">
-                    <p>Data provided by <a href="https://restcountries.com" class="text-white">REST Countries API</a></p>
-                </div>
-            </div>
-        </div>
-    </footer>
-
+    <!-- Bootstrap JS and Popper.js -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Main JavaScript -->
     <script>
-        // Global variables
-        let countriesData = [];
-        let selectedRegion = 'all';
-        let countryModal;
+        // API endpoint
+        const API_BASE_URL = '/api/countries/';
+        let currentPage = 1;
+        let totalPages = 1;
+        let currentSearch = '';
+        let currentRegion = '';
+        let currentSort = '';
 
         // DOM elements
-        const countriesContainer = document.getElementById('countriesContainer');
+        const countriesTableBody = document.getElementById('countriesTableBody');
+        const pagination = document.getElementById('pagination');
         const searchInput = document.getElementById('searchInput');
         const searchButton = document.getElementById('searchButton');
-        const regionFilters = document.getElementById('regionFilters');
-        
-        // Initialize when DOM is loaded
+        const resetButton = document.getElementById('resetButton');
+        const regionFilter = document.getElementById('regionFilter');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        const noResults = document.getElementById('noResults');
+        const sortIcons = document.querySelectorAll('.fa-sort');
+
+        // Initialize the page
         document.addEventListener('DOMContentLoaded', function() {
-            // Initialize Bootstrap modal
-            countryModal = new bootstrap.Modal(document.getElementById('countryModal'));
-            
-            // Fetch countries data
             fetchCountries();
+            populateRegions();
             
-            // Set up event listeners
+            // Event listeners
             searchButton.addEventListener('click', handleSearch);
-            searchInput.addEventListener('keyup', function(event) {
-                if (event.key === 'Enter') {
-                    handleSearch();
-                }
+            resetButton.addEventListener('click', resetSearch);
+            regionFilter.addEventListener('change', handleRegionFilter);
+            
+            // Add event listeners to sort icons
+            sortIcons.forEach(icon => {
+                icon.addEventListener('click', function() {
+                    const field = this.getAttribute('data-sort');
+                    handleSort(field);
+                });
             });
             
-            // Region filter buttons
-            const regionButtons = regionFilters.querySelectorAll('button');
-            regionButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    // Remove active class from all buttons
-                    regionButtons.forEach(btn => btn.classList.remove('active'));
-                    // Add active class to clicked button
-                    this.classList.add('active');
-                    // Set selected region
-                    selectedRegion = this.dataset.region;
-                    // Filter countries
-                    filterCountries();
-                });
+            // Enable pressing Enter in search field
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    handleSearch();
+                }
             });
         });
 
         // Fetch countries from API
-        async function fetchCountries() {
-            try {
-                const response = await fetch('/api/countries/');
-                
-                if (!response.ok) {
-                    throw new Error('Failed to fetch countries data');
-                }
-                
-                countriesData = await response.json();
-                
-                // Display countries
-                filterCountries();
-                
-            } catch (error) {
-                console.error('Error fetching countries:', error);
-                countriesContainer.innerHTML = `
-                    <div class="col-12 text-center">
-                        <div class="alert alert-danger">
-                            Failed to load countries data. Please try again later.
-                        </div>
-                    </div>
-                `;
+        function fetchCountries(page = 1) {
+            showLoading(true);
+            
+            let url = `${API_BASE_URL}?page=${page}`;
+            
+            // Add search parameter if exists
+            if (currentSearch) {
+                url += `&search=${encodeURIComponent(currentSearch)}`;
             }
+            
+            // Add region filter if exists
+            if (currentRegion) {
+                url += `&region=${encodeURIComponent(currentRegion)}`;
+            }
+            
+            // Add sorting if exists
+            if (currentSort) {
+                url += `&ordering=${encodeURIComponent(currentSort)}`;
+            }
+            
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    renderCountriesTable(data.results);
+                    renderPagination(data);
+                    showLoading(false);
+                    noResults.style.display = data.results.length === 0 ? 'block' : 'none';
+                })
+                .catch(error => {
+                    console.error('Error fetching countries:', error);
+                    showLoading(false);
+                    alert('Error loading countries. Please try again.');
+                });
         }
 
-        // Filter and display countries
-        function filterCountries() {
-            let filteredCountries = countriesData;
-            
-            // Filter by region if not "all"
-            if (selectedRegion !== 'all') {
-                filteredCountries = filteredCountries.filter(country => country.region === selectedRegion);
-            }
-            
-            // Filter by search term if there is one
-            const searchTerm = searchInput.value.trim().toLowerCase();
-            if (searchTerm) {
-                filteredCountries = filteredCountries.filter(country => 
-                    country.name_common.toLowerCase().includes(searchTerm)
-                );
-            }
-            
-            // Display filtered countries
-            displayCountries(filteredCountries);
+        // Populate region filter
+        function populateRegions() {
+            fetch(`${API_BASE_URL}`)
+                .then(response => response.json())
+                .then(data => {
+                    const regions = new Set();
+                    data.results.forEach(country => {
+                        if (country.region) {
+                            regions.add(country.region);
+                        }
+                    });
+                    
+                    // Sort regions alphabetically
+                    const sortedRegions = Array.from(regions).sort();
+                    
+                    // Add options to select
+                    sortedRegions.forEach(region => {
+                        const option = document.createElement('option');
+                        option.value = region;
+                        option.textContent = region;
+                        regionFilter.appendChild(option);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching regions:', error);
+                });
         }
 
-        // Display countries in the container
-        function displayCountries(countries) {
-            if (countries.length === 0) {
-                countriesContainer.innerHTML = `
-                    <div class="col-12 text-center">
-                        <div class="alert alert-info">
-                            No countries found matching your criteria.
-                        </div>
-                    </div>
-                `;
-                return;
-            }
-            
-            let html = '';
+        // Render countries table
+        function renderCountriesTable(countries) {
+            countriesTableBody.innerHTML = '';
             
             countries.forEach(country => {
-                html += `
-                    <div class="col-sm-6 col-md-4 col-lg-3 mb-4">
-                        <div class="card country-card h-100" data-country-code="${country.cca3}">
-                            <div class="flag-container p-2">
-                                <img src="${country.flag_png || ''}" alt="${country.name_common} flag" class="card-img-top" 
-                                     onerror="this.onerror=null;this.src='https://via.placeholder.com/150x100?text=No+Flag';">
-                            </div>
-                            <div class="card-body">
-                                <h5 class="card-title">${country.flag_emoji || ''} ${country.name_common
+                const row = document.createElement('tr');
+                
+                // Format the population with commas
+                const formattedPopulation = new Intl.NumberFormat().format(country.population);
+                
+                // Get the first timezone or 'N/A'
+                const timezone = country.timezones && country.timezones.length > 0 ? 
+                    country.timezones[0] : 'N/A';
+                
+                row.innerHTML = `
+                    <td>
+                        <img src="${country.flag || '/static/placeholder-flag.png'}" alt="${country.name} flag" class="flag-img">
+                    </td>
+                    <td>${country.name}</td>
+                    <td>${country.alpha2code}</td>
+                    <td>${country.capital || 'N/A'}</td>
+                    <td>${formattedPopulation}</td>
+                    <td>${timezone}</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary details-btn" data-id="${country.id}">
+                            <i class="fas fa-info-circle"></i> Details
+                        </button>
+                    </td>
+                `;
+                
+                countriesTableBody.appendChild(row);
+            });
+            
+            // Add event listeners to details buttons
+            document.querySelectorAll('.details-btn').forEach(button => {
+                button.addEventListener('click', function() {
+                    const countryId = this.getAttribute('data-id');
+                    showCountryDetails(countryId);
+                });
+            });
+        }
+
+        // Render pagination controls
+        function renderPagination(data) {
+            pagination.innerHTML = '';
+            currentPage = data.current_page || 1;
+            totalPages = Math.ceil(data.count / (data.results.length || 1));
+            
+            // Previous button
+            const prevItem = document.createElement('li');
+            prevItem.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+            prevItem.innerHTML = `<a class="page-link" href="#" data-page="${currentPage - 1}">Previous</a>`;
+            pagination.appendChild(prevItem);
+            
+            // Page numbers
+            const startPage = Math.max(1, currentPage - 2);
+            const endPage = Math.min(totalPages, startPage + 4);
+            
+            for (let i = startPage; i <= endPage; i++) {
+                const pageItem = document.createElement('li');
+                pageItem.className = `page-item ${i === currentPage ? 'active' : ''}`;
+                pageItem.innerHTML = `<a class="page-link" href="#" data-page="${i}">${i}</a>`;
+                pagination.appendChild(pageItem);
+            }
+            
+            // Next button
+            const nextItem = document.createElement('li');
+            nextItem.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+            nextItem.innerHTML = `<a class="page-link" href="#" data-page="${currentPage + 1}">Next</a>`;
+            pagination.appendChild(nextItem);
+            
+            // Add event listeners to pagination links
+            document.querySelectorAll('.page-link').forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (!this.parentElement.classList.contains('disabled')) {
+                        const page = parseInt(this.getAttribute('data-page'));
+                        fetchCountries(page);
+                    }
+                });
+            });
+        }
+
+        // Show country details modal
+        function showCountryDetails(countryId) {
+            fetch(`${API_BASE_URL}${countryId}/`)
+                .then(response => response.json())
+                .then(country => {
+                    // Populate modal with country details
+                    document.getElementById('modalFlag').src = country.flag || '/static/placeholder-flag.png';
+                    document.getElementById('modalCountryName').textContent = country.name;
+                    document.getElementById('modalCountryCode').textContent = country.alpha3code;
+                    document.getElementById('modalRegion').textContent = country.region || 'Unknown Region';
+                    document.getElementById('modalCapital').textContent = country.capital || 'N/A';
+                    document.getElementById('modalPopulation').textContent = new Intl.NumberFormat().format(country.population);
+                    document.getElementById('modalArea').textContent = country.area ? new Intl.NumberFormat().format(country.area) : 'N/A';
+                    
+                    // Timezones
+                    const timezonesElement = document.getElementById('modalTimezones');
+                    if (country.timezones && country.timezones.length > 0) {
+                        timezonesElement.textContent = country.timezones.join(', ');
+                    } else {
+                        timezonesElement.textContent = 'N/A';
+                    }
+                    
+                    // Languages
+                    const languagesElement = document.getElementById('modalLanguages');
+                    languagesElement.innerHTML = '';
+                    
+                    if (country.languages && country.languages.length > 0) {
+                        country.languages.forEach(lang => {
+                            const langItem = document.createElement('li');
+                            langItem.className = 'list-group-item';
+                            langItem.textContent = lang.name;
+                            languagesElement.appendChild(langItem);
+                        });
+                    } else {
+                        const langItem = document.createElement('li');
+                        langItem.className = 'list-group-item';
+                        langItem.textContent = 'No language data available';
+                        languagesElement.appendChild(langItem);
+                    }
+                    
+                    // Show the modal
+                    const modal = new bootstrap.Modal(document.getElementById('countryDetailsModal'));
+                    modal.show();
+                    
+                    // Fetch same region countries
+                    fetchSameRegionCountries(countryId);
+                })
+                .catch(error => {
+                    console.error('Error fetching country details:', error);
+                    alert('Error loading country details. Please try again.');
+                });
+        }
+
+        // Fetch countries in the same region
+        function fetchSameRegionCountries(countryId) {
+            const sameRegionContainer = document.getElementById('sameRegionContainer');
+            const sameRegionLoading = document.getElementById('sameRegionLoading');
+            
+            sameRegionContainer.innerHTML = '';
+            sameRegionLoading.style.display = 'block';
+            
+            fetch(`${API_BASE_URL}${countryId}/same_region/`)
+                .then(response => response.json())
+                .then(countries => {
+                    sameRegionLoading.style.display = 'none';
+                    
+                    if (countries.length === 0) {
+                        sameRegionContainer.innerHTML = '<p class="text-center">No other countries in this region.</p>';
+                        return;
+                    }
+                    
+                    // Create badges for each country
+                    const regionBadgesDiv = document.createElement('div');
+                    regionBadgesDiv.className = 'd-flex flex-wrap gap-2';
+                    
+                    countries.forEach(country => {
+                        const badge = document.createElement('span');
+                        badge.className = 'badge bg-secondary region-badge';
+                        badge.textContent = country.name;
+                        badge.style.cursor = 'pointer';
+                        badge.setAttribute('data-id', country.id);
+                        badge.addEventListener('click', function() {
+                            // Close current modal
+                            bootstrap.Modal.getInstance(document.getElementById('countryDetailsModal')).hide();
+                            
+                            // Open new country details
+                            setTimeout(() => {
+                                showCountryDetails(this.getAttribute('data-id'));
+                            }, 500);
+                        });
+                        
+                        regionBadgesDiv.appendChild(badge);
+                    });
+                    
+                    sameRegionContainer.appendChild(regionBadgesDiv);
+                })
+                .catch(error => {
+                    console.error('Error fetching same region countries:', error);
+                    sameRegionLoading.style.display = 'none';
+                    sameRegionContainer.innerHTML = '<p class="text-center text-danger">Error loading regional data.</p>';
+                });
+        }
+
+        // Handle search
+        function handleSearch() {
+            currentSearch = searchInput.value.trim();
+            currentPage = 1;
+            fetchCountries();
+        }
+
+        // Reset search
+        function resetSearch() {
+            searchInput.value = '';
+            regionFilter.value = '';
+            currentSearch = '';
+            currentRegion = '';
+            currentSort = '';
+            currentPage = 1;
+            fetchCountries();
+        }
+
+        // Handle region filter
+        function handleRegionFilter() {
+            currentRegion = regionFilter.value;
+            currentPage = 1;
+            fetchCountries();
+        }
+
+        // Handle sorting
+        function handleSort(field) {
+            // Toggle between ascending and descending
+            if (currentSort === field) {
+                currentSort = `-${field}`;
+            } else if (currentSort === `-${field}`) {
+                currentSort = '';
+            } else {
+                currentSort = field;
+            }
+            
+            // Reset to first page
+            currentPage = 1;
+            fetchCountries();
+        }
+
+        // Show/hide loading indicator
+        function showLoading(show) {
+            loadingIndicator.style.display = show ? 'block' : 'none';
+        }
+    </script>
+</body>
+</html>
