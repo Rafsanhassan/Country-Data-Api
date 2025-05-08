@@ -4,7 +4,8 @@ class Country(models.Model):
     """
     Model representing a country with detailed information.
     """
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(default="Unknown", max_length=100)
+
     alpha2code = models.CharField(max_length=2, unique=True)
     alpha3code = models.CharField(max_length=3, unique=True)
     capital = models.CharField(max_length=255, null=True, blank=True)

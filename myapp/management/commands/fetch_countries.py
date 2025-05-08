@@ -31,7 +31,7 @@ class Command(BaseCommand):
                 name_common = country_data.get('name', {}).get('common', '')
                 name_official = country_data.get('name', {}).get('official', '')
                 cca2 = country_data.get('cca2', '')
-                cca3 = country_data.get('cca3', '')
+                cca3 = country_data.get('cca3', '')  # This will go into alpha3code
                 flag_emoji = country_data.get('flag', '')
                 flag_png = country_data.get('flags', {}).get('png', '')
                 region = country_data.get('region', '')
@@ -55,23 +55,19 @@ class Command(BaseCommand):
                 borders = country_data.get('borders', [])
                 timezones = country_data.get('timezones', [])
                 
-                # Create or update country record
+                # Create or update country record using alpha3code instead of cca3
                 country, created = Country.objects.update_or_create(
-                    cca3=cca3,
+                    alpha3code=cca3,
                     defaults={
-                        'name_common': name_common,
-                        'name_official': name_official,
-                        'cca2': cca2,
-                        'flag_emoji': flag_emoji,
-                        'flag_png': flag_png,
+                        'name': name_common,
+                        'native_name': name_official,
+                        'alpha2code': cca2,
+                        'flag': flag_png,
                         'region': region,
                         'subregion': subregion,
                         'capital': capital,
                         'population': population,
                         'area': area,
-                        'independent': independent,
-                        'un_member': un_member,
-                        'landlocked': landlocked,
                         'currencies': currencies,
                         'languages': languages,
                         'latlng': latlng,
