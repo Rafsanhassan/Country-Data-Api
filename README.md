@@ -1,104 +1,217 @@
+# Country Data Explorer
 
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e9f256f (Update README.md)
-# Countries Information API
+A Django-based web application for exploring and viewing country information. This project features a RESTful API and a web interface with authentication to display detailed information about countries around the world.
 
-This Django application fetches and displays data about countries from the REST Countries API. It provides both a web interface and RESTful API endpoints for accessing country information.
+## Table of Contents
+
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Endpoints](#api-endpoints)
+- [Authentication](#authentication)
+- [Development Phases](#development-phases)
 
 ## Features
 
-- Fetches data from [REST Countries API](https://restcountries.com/v3.1/all)
-- Stores country data in a Django model
-- Provides RESTful API endpoints for accessing the data
-- Secured web interface with authentication
-- Search and filter functionality
-- Responsive design
+- Display comprehensive information about countries including:
+  - Name, country code, capital
+  - Population, timezone, region
+  - Flag, languages spoken
+- Search functionality to find countries by name
+- Detailed view showing regional countries and languages
+- RESTful API for programmatic access to country data
+- Authentication system to restrict access to authorized users
+- Responsive design using Bootstrap
 
-## Setup Instructions
+## Project Structure
 
-### 1. Install Required Packages
-
-```bash
-pip install django djangorestframework requests django-cors-headers django-filter
+```
+assignment/
+  ├── assignment/         # Project settings directory
+  │   ├── __init__.py
+  │   ├── settings.py     # Project settings
+  │   ├── urls.py         # Main URL configuration
+  │   ├── wsgi.py
+  │   └── asgi.py
+  ├── myapp/              # Main application directory
+  │   ├── __init__.py
+  │   ├── admin.py        # Admin configuration
+  │   ├── apps.py
+  │   ├── models.py       # Country data model
+  │   ├── serializers.py  # API serializers
+  │   ├── urls.py         # App URL configuration
+  │   ├── views.py        # Views and API viewsets
+  │   ├── management/     # Custom management commands
+  │   │   ├── __init__.py
+  │   │   └── commands/
+  │   │       ├── __init__.py
+  │   │       ├── import_countries.py     # Command to import country data
+  │   │       └── create_test_user.py     # Command to create test users
+  │   ├── static/
+  │   │   └── myapp/
+  │   │       └── images/
+  │   │           └── placeholder-flag.svg   # Placeholder flag image
+  │   └── templates/     # HTML templates
+  │       ├── myapp/
+  │       │   └── index.html              # Main country list template
+  │       └── registration/
+  │           ├── login.html              # Login page template
+  │           └── logged_out.html         # Logout confirmation template
+  ├── manage.py          # Django management script
+  └── requirements.txt   # Project dependencies
 ```
 
-### 2. Configure the Application
+## Installation
 
-The project is already set up with the necessary configurations in `settings.py`.
+### Prerequisites
 
-### 3. Apply Migrations
+- Python 3.8 or higher
+- pip (Python package manager)
 
-Create and apply database migrations:
+### Setup Steps
 
-```bash
-python manage.py makemigrations
-python manage.py migrate
-```
+1. Clone the repository:
+   ```bash
+   git clone <repository-url>
+   cd assignment
+   ```
 
-### 4. Create Superuser
+2. Create a virtual environment:
+   ```bash
+   python -m venv venv
+   ```
 
-Create an admin user to access the secured features:
+3. Activate the virtual environment:
+   - Windows:
+     ```bash
+     venv\Scripts\activate
+     ```
+   - macOS/Linux:
+     ```bash
+     source venv/bin/activate
+     ```
 
-```bash
-python manage.py createsuperuser
-```
+4. Install required packages:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 5. Fetch Country Data
+5. Run migrations:
+   ```bash
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
 
-Run the management command to fetch country data from the REST Countries API:
+6. Create a test user:
+   ```bash
+   python manage.py create_test_user
+   ```
+   This creates a user with username `admin` and password `password123`
 
-```bash
-python manage.py fetch_countries
-```
+7. Import country data:
+   ```bash
+   python manage.py import_countries
+   ```
 
-### 6. Run Development Server
+## Usage
 
-Start the Django development server:
+### Running the Server
 
+Start the development server:
 ```bash
 python manage.py runserver
 ```
 
-The application will be available at http://127.0.0.1:8000/
+Access the application at http://localhost:8000/
 
-## Project Structure
+### Accessing the Application
 
-- `models.py`: Defines the `Country` model with all relevant fields
-- `views.py`: Contains web views and API endpoints
-- `urls.py`: Defines URL routing
-- `serializers.py`: Provides JSON serialization for the API
-- `admin.py`: Registers models with the Django admin interface
-- `management/commands/fetch_countries.py`: Management command to fetch data
+1. Navigate to http://localhost:8000/
+2. You'll be redirected to the login page
+3. Log in with:
+   - Username: `admin`
+   - Password: `password123`
+4. After logging in, you'll see the list of countries
+5. Use the search box to find countries by name
+6. Click the "Details" button to view more information about a specific country
+
+### Admin Interface
+
+Access the Django admin interface at http://localhost:8000/admin/ to manage users and country data.
 
 ## API Endpoints
 
 All API endpoints require authentication.
 
-- `GET /api/countries/`: List all countries (paginated)
-- `GET /api/countries/<id>/`: Get details for a specific country by ID
-- `GET /api/country/<code>/`: Get details for a country by code (CCA2 or CCA3)
-- `GET /api/regions/`: Get list of unique regions
-- `GET /api/search/?q=<term>`: Search countries by name
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/countries/` | GET | List all countries |
+| `/api/countries/?search=term` | GET | Search countries by name |
+| `/api/countries/{cca2}/` | GET | Get details for a specific country |
+| `/api/countries/{cca2}/regional_countries/` | GET | Get countries in the same region |
+| `/api/countries/{cca2}/languages/` | GET | Get languages spoken in the country |
+
+### API Usage Examples
+
+Using cURL with authentication:
+```bash
+curl -u admin:password123 http://localhost:8000/api/countries/
+```
 
 ## Authentication
 
-The API and the web interface are secured using Django's authentication system. You can:
+The application uses Django's built-in authentication system:
 
-1. Login at the `/login/` endpoint
-2. Use Django REST Framework's session authentication
-3. Use Basic Authentication for API requests
+- All views and API endpoints are restricted to authenticated users
+- Session-based authentication for web interface
+- Basic authentication for API access
+- Custom styled login/logout pages
 
-## Testing
+### Creating Additional Users
 
-Run tests with:
-
+Create a superuser account:
 ```bash
-python manage.py test
+python manage.py createsuperuser
 ```
-<<<<<<< HEAD
-=======
->>>>>>> commit123
-=======
->>>>>>> e9f256f (Update README.md)
+
+Then access the admin interface at http://localhost:8000/admin/ to manage users.
+
+## Development Phases
+
+This project was developed in four main phases:
+
+### Phase 1: Data Model
+
+- Designed and implemented the Country model
+- Created management command to import country data from the REST Countries API
+- Implemented data validation and basic error handling
+
+### Phase 2: REST API
+
+- Implemented RESTful API with Django REST Framework
+- Created serializers for country data
+- Added search functionality
+- Implemented filtering and detailed endpoints for country information
+
+### Phase 3: Web Interface
+
+- Designed and implemented a responsive web interface using Bootstrap
+- Created templates for displaying country information
+- Implemented search functionality in the UI
+- Added detailed view with regional countries and languages
+
+### Phase 4: Authentication and Security
+
+- Implemented authentication using Django's built-in User model
+- Restricted API access to authenticated users
+- Created login/logout pages
+- Added security features like CSRF protection and secure password validation
+
+## License
+
+[Include your license information here]
+
+## Contributors
+
+[Include contributor information here]
